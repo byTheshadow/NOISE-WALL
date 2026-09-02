@@ -2,156 +2,97 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  />
-
-  <title>THE LAST FREQUENCY</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>VOIR // 虚空回响</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-  <link rel="stylesheet" href="./style.css" />
+  <!-- 先锋英文字体 + 锐利中文字体 -->
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Noto+Serif+SC:wght@300;600;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <!-- Three.js & GSAP -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
-
 <body>
-  <main id="app">
+  <!-- 噪点微粒蒙版 -->
+  <div class="noise-overlay"></div>
+  <canvas id="webgl-canvas"></canvas>
 
-    <div id="scene"></div>
+  <!-- 音频容器 -->
+  <audio id="audio-player" src="https://github.com/byTheshadow/song/raw/refs/heads/main/M500002bff4Z2rtysY.mp3" preload="auto" crossorigin="anonymous"></audio>
 
-    <div class="grain"></div>
-    <div class="vignette"></div>
+  <!-- 顶部状态栏 -->
+  <header class="hud-header">
+    <div class="hud-tag">// NOISE_SYSTEM.V4</div>
+    <div class="hud-status" id="system-status">STATUS: STANDBY</div>
+  </header>
 
-    <header class="topbar">
-      <div class="brand">THE LAST FREQUENCY</div>
-      <div class="status" id="statusText">SYSTEM / STANDBY</div>
-    </header>
+  <!-- 第 1 幕：虚空音波启动页 -->
+  <section id="screen-intro" class="screen-overlay active">
+    <div class="intro-content">
+      <p class="sub-lead">[ 频 率 校 准 仪 式 ]</p>
+      <h1 class="main-title">SONIC VOID</h1>
+      <p class="intro-desc">虚空之中，唯有共振得以穿透物质。<br>佩戴耳机，以获取最佳动态声场。</p>
+      <button id="btn-enter" class="noir-btn">
+        <span class="btn-glitch"></span>
+        <span class="btn-text">/// 拨动琴弦 · 启封音轨</span>
+      </button>
+    </div>
+  </section>
 
-    <section class="intro-screen" id="introScreen">
-      <div class="intro-copy">
-        <p class="eyebrow">PRIVATE AUDIO ARCHIVE / 001</p>
+  <!-- 第 3 & 4 幕：盲盒交互 HUD 界面 -->
+  <section id="screen-box-ui" class="screen-overlay pointer-events-none">
+    <div class="box-hud-container pointer-events-auto">
+      <div id="track-indicator" class="track-info">TRACK: --</div>
 
-        <h1>
-          THE<br />
-          FREQUENCY<br />
-          IS WAITING
-        </h1>
+      <!-- 摇晃线索浮现面板 -->
+      <div id="clue-deck" class="clue-deck">
+        <div class="clue-item" id="clue-1"></div>
+        <div class="clue-item" id="clue-2"></div>
+        <div class="clue-item" id="clue-3"></div>
+      </div>
 
-        <p class="intro-cn">频率尚未苏醒</p>
+      <!-- 交互控制面板 -->
+      <div class="interaction-prompt" id="shake-prompt">
+        <span class="prompt-icon">✦</span>
+        <span id="prompt-text">摇晃设备或按住拖拽以破译线索</span>
+        <div class="shake-progress-bar">
+          <div class="shake-progress-fill" id="shake-fill"></div>
+        </div>
+      </div>
 
-        <button class="primary-button" id="enterButton">
-          <span>ENTER THE SIGNAL</span>
-          <small>进入信号场</small>
+      <!-- 抉择按键组 -->
+      <div class="decision-group" id="decision-group">
+        <button id="btn-cancel" class="noir-btn ghost-btn">
+          <span class="btn-text">↺ 封存 · 重选音轨</span>
         </button>
-
-        <p class="audio-note" id="audioNote">
-          AUDIO CHANNEL / ATTEMPTING CONNECTION
-        </p>
+        <button id="btn-unlock" class="noir-btn highlight-btn">
+          <span class="btn-text">✦ 破壳解密</span>
+        </button>
       </div>
+    </div>
+  </section>
 
-      <div class="intro-meta">
-        <span>MONOCHROME AUDIO EXPERIENCE</span>
-        <span>USE HEADPHONES IF POSSIBLE</span>
+  <!-- 第 5 幕 / 归档页：已解密档案卡片 -->
+  <section id="screen-manifest" class="screen-overlay pointer-events-none">
+    <div class="manifest-wrapper pointer-events-auto" id="manifest-card">
+      <div class="manifest-header">
+        <span class="manifest-badge">[ PERMANENT ARCHIVE ]</span>
+        <span class="manifest-id" id="manifest-code">AUTH-000</span>
       </div>
-    </section>
-
-    <section class="vault-screen hidden" id="vaultScreen">
-      <div class="vault-heading">
-        <p class="eyebrow">THE STAVE CONSTELLATION / 004 NODES</p>
-        <h2>SELECT A<br />RESONANCE</h2>
-        <p class="vault-cn">选择一段尚未开启的频率</p>
+      <div class="manifest-body">
+        <h2 class="manifest-title" id="manifest-title">TITLE</h2>
+        <div class="manifest-divider"></div>
+        <p class="manifest-text" id="manifest-text">TEXT</p>
       </div>
-
-      <div class="vault-instruction">
-        <span>DRAG TO EXPLORE</span>
-        <span>TAP A NODE TO INSPECT</span>
+      <div class="manifest-footer">
+        <span class="stamp-verified">// CERTIFIED PURE BLACK</span>
+        <span class="timestamp" id="manifest-time">TIMESTAMP</span>
       </div>
+    </div>
+  </section>
 
-      <div class="track-list" id="trackList"></div>
-    </section>
-
-    <section class="box-screen hidden" id="boxScreen">
-      <div class="box-header">
-        <p class="eyebrow" id="boxEyebrow">TRACK 01 / OVERDRIVE</p>
-        <h2 id="boxTitle">失真纪元</h2>
-        <p class="box-subtitle" id="boxSubtitle"></p>
-      </div>
-
-      <div class="box-panel">
-        <div class="shake-progress">
-          <div class="progress-label">
-            <span>RESONANCE LEVEL</span>
-            <span id="shakeCount">00 / 03</span>
-          </div>
-
-          <div class="progress-line">
-            <span id="progressBar"></span>
-          </div>
-        </div>
-
-        <div class="clue-area" id="clueArea">
-          <p class="clue-placeholder">
-            SHAKE THE OBJECT TO REVEAL ITS ECHO
-          </p>
-        </div>
-
-        <div class="box-actions">
-          <button class="primary-button shake-button" id="shakeButton">
-            <span>SHAKE THE BOX</span>
-            <small>摇晃盲盒</small>
-          </button>
-
-          <button class="text-button hidden" id="openButton">
-            OPEN THE SIGNAL / 打开信号
-          </button>
-
-          <button class="text-button" id="changeButton">
-            CHANGE THE TRACK / 更换音轨
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <section class="claimed-screen hidden" id="claimedScreen">
-      <div class="claimed-content">
-        <p class="eyebrow">PRIVATE ARCHIVE / SIGNAL CLAIMED</p>
-
-        <h2 id="claimedTitle">ARCHIVED FREQUENCY</h2>
-
-        <div class="claimed-line"></div>
-
-        <p class="claimed-date" id="claimedDate"></p>
-
-        <article class="manifest-card">
-          <p class="card-code" id="claimedCode"></p>
-          <h3 id="claimedManifestTitle"></h3>
-          <div id="claimedText"></div>
-        </article>
-
-        <p class="locked-note">
-          THIS FREQUENCY HAS BEEN OPENED ONCE.<br />
-          此频率已经被开启过一次。
-        </p>
-      </div>
-    </section>
-
-    <section class="opening-layer hidden" id="openingLayer">
-      <div class="opening-flash"></div>
-      <div class="opening-title">SIGNAL MANIFESTED</div>
-    </section>
-
-    <audio
-      id="backgroundAudio"
-      src="https://github.com/byTheshadow/song/raw/refs/heads/main/M500002bff4Z2rtysY.mp3"
-      loop
-      crossorigin="anonymous"
-      playsinline
-    ></audio>
-
-  </main>
-
-  <script type="module" src="./main.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
+
