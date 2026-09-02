@@ -1,8 +1,10 @@
 /* =========================================================================
-   VOIR // 3D INTERACTIVE MONOCHROME NOIR BLIND BOX (UPDATED)
+   VOIR // 3D INTERACTIVE MONOCHROME NOIR BLIND BOX
    ========================================================================= */
 
-const AUDIO_URL = "https://github.com/byTheshadow/song/raw/refs/heads/main/M500002bff4Z2rtysY.mp3";
+// 使用全开放 CORS 的 jsDelivr CDN 加速直链（原仓库音频的镜像解析）
+// 若 CDN 稍有延迟，备用了 raw.githubusercontent.com
+const AUDIO_URL = "https://cdn.jsdelivr.net/gh/byTheshadow/song@main/M500002bff4Z2rtysY.mp3";
 const STORAGE_KEY = "VOIR_LOCKED_MANIFEST_AUTH";
 
 // 盲盒迷幻文案数据源
@@ -57,7 +59,7 @@ const BOX_REGISTRY = [
   }
 ];
 
-// 状态控制
+// 状态机
 let currentStep = 'INTRO';
 let selectedBoxIndex = null;
 let shakeCount = 0;
@@ -68,12 +70,9 @@ let isLocked = false;
 let scene, camera, renderer;
 let waveMesh, staveLinesGroup, boxesGroup, cardMesh;
 let raycaster, mouse;
+let audioInstance = null;
 
-// 音频
-let audioEl = null;
-let audioContext = null, analyser = null, dataArray = null;
-
-// DOM 节点
+// DOM 元素
 const screenIntro = document.getElementById('screen-intro');
 const screenBoxUi = document.getElementById('screen-box-ui');
 const screenManifest = document.getElementById('screen-manifest');
@@ -90,10 +89,10 @@ window.addEventListener('DOMContentLoaded', () => {
   animate();
 });
 
-// 提供给控制台快速测试重置的指令
+// 控制台清空重置指令
 window.resetVault = function() {
   localStorage.removeItem(STORAGE_KEY);
-  console.log("%c[VOIR SYSTEM] 本地抽取记录已彻底清空，正在重载页面...", "color: #ffffff; background: #000000; padding: 4px 8px;");
+  console.log("%c[VOIR SYSTEM] 本地记录已清空，正在重载...", "color: #ffffff; background: #000000; padding: 4px 8px;");
   location.reload();
 };
 
@@ -140,7 +139,7 @@ function initThree() {
 }
 
 function createWaveVisualizer() {
-  const geometry = new THREE.PlaneGeometry(32, 6, 64, 16);
+  const geometry = new THREE.PlaneGeometry(32, 8, 64, 16);
   const material = new THREE.MeshStandardMaterial({
     color: 0xcccccc,
     wireframe: true,
@@ -212,44 +211,27 @@ function create3DCardMesh() {
   scene.add(cardMesh);
 }
 
-// 健壮的双轨音频播放器
-function startAudioPlayback() {
-  if (!audioEl) {
-    audioEl = new Audio();
-    audioEl.src = AUDIO_URL;
-    audioEl.loop = true;
-    audioEl.crossOrigin = "anonymous";
+// 纯净无阻碍的音频播放引擎（避开 CORS 干扰）
+function playRockBGM() {
+  if (!audioInstance) {
+    audioInstance = new Audio(AUDIO_URL);
+    audioInstance.loop = true;
+    audioInstance.volume = 0.85;
   }
-
-  // 尝试启动 Web Audio 频谱
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext;
-    if (AudioCtx) {
-      if (!audioContext) {
-        audioContext = new AudioCtx();
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 64;
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-        const source = audioContext.createMediaElementSource(audioEl);
-        source.connect(analyser);
-        analyser.connect(audioContext.destination);
-      }
-      if (audioContext.state === 'suspended') {
-        audioContext.resume();
-      }
-    }
-  } catch (err) {
-    console.warn("Web Audio API 降级为原生高保真流:", err);
-  }
-
-  audioEl.play().catch(e => {
-    console.log("音频自动播放等待手势唤醒:", e);
+  audioInstance.play().then(() => {
+    console.log("[AUDIO] 摇滚音轨已成功加载并奏响。");
+  }).catch((err) => {
+    console.warn("[AUDIO] 自动播放受限，将在第一次屏幕触摸时触发:", err);
+    // iOS / 移动端防呆：任何屏幕轻触均唤醒音频
+    document.body.addEventListener('touchstart', () => {
+      audioInstance.play();
+    }, { once: true });
   });
 }
 
 function bindEvents() {
   btnEnter.addEventListener('click', () => {
-    startAudioPlayback();
+    playRockBGM();
     systemStatus.innerText = "STATUS: RESONATING";
 
     gsap.to(screenIntro, {
@@ -278,14 +260,14 @@ function bindEvents() {
   });
   window.addEventListener('mouseup', () => { isDragging = false; });
 
-  // 手机真机加速度计摇晃
+  // 手机真机陀螺仪/加速度计摇晃
   if (window.DeviceMotionEvent) {
     window.addEventListener('devicemotion', (e) => {
       if (currentStep !== 'FOCUS_BOX') return;
       const acc = e.accelerationIncludingGravity;
       if (!acc) return;
       const totalAcc = Math.abs(acc.x || 0) + Math.abs(acc.y || 0) + Math.abs(acc.z || 0);
-      if (totalAcc > 26) {
+      if (totalAcc > 24) {
         stepShake();
       }
     });
@@ -306,7 +288,6 @@ function transitionToStave() {
   gsap.from(boxesGroup.position, { z: -30, duration: 1.5, ease: "power3.out" });
   gsap.to(camera.position, { z: 12, duration: 1.5 });
 
-  // 显示选盒引导提示
   staveGuideTip.classList.add('show');
 }
 
@@ -330,7 +311,6 @@ function focusOnBox(box) {
   selectedBoxIndex = box.userData.id - 1;
   const boxData = BOX_REGISTRY[selectedBoxIndex];
 
-  // 隐藏五线谱引导，更新状态
   staveGuideTip.classList.remove('show');
   systemStatus.innerText = `LOCKED: TRACK 0${boxData.id}`;
   document.getElementById('track-indicator').innerText = boxData.name;
@@ -347,10 +327,10 @@ function focusOnBox(box) {
   screenBoxUi.classList.add('active');
 }
 
-// 严格逐次摇晃状态机
+// 逐次摇晃逻辑
 function stepShake() {
   const now = Date.now();
-  if (now - lastShakeTimestamp < 500) return; // 严格限频防误触
+  if (now - lastShakeTimestamp < 500) return;
   lastShakeTimestamp = now;
 
   if (shakeCount >= 3) return;
@@ -358,7 +338,6 @@ function stepShake() {
 
   const activeBox = boxesGroup.children[selectedBoxIndex];
 
-  // 物理抖动
   gsap.to(activeBox.rotation, {
     x: (Math.random() - 0.5) * 0.7,
     y: (Math.random() - 0.5) * 0.7,
@@ -371,7 +350,6 @@ function stepShake() {
     }
   });
 
-  // 进度更新
   document.getElementById('shake-fill').style.width = `${(shakeCount / 3) * 100}%`;
 
   const boxData = BOX_REGISTRY[selectedBoxIndex];
@@ -465,17 +443,19 @@ function showPermanentManifest(data) {
 function animate() {
   requestAnimationFrame(animate);
 
-  if (analyser && dataArray && currentStep === 'INTRO') {
-    analyser.getByteFrequencyData(dataArray);
-    const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+  // 优雅的丝带正弦动态模拟
+  if (currentStep === 'INTRO' && waveMesh) {
+    const time = Date.now() * 0.003;
     waveMesh.geometry.attributes.position.needsUpdate = true;
     const pos = waveMesh.geometry.attributes.position;
     for (let i = 0; i < pos.count; i++) {
       const u = pos.getX(i);
-      pos.setZ(i, Math.sin(u * 0.5 + Date.now() * 0.003) * (avg * 0.04));
+      const v = pos.getY(i);
+      pos.setZ(i, Math.sin(u * 0.4 + time) * 1.5 + Math.cos(v * 0.6 + time * 1.2) * 0.8);
     }
   }
 
+  // 盲盒悬浮自转
   if (currentStep === 'STAVE' && boxesGroup) {
     const time = Date.now() * 0.0015;
     boxesGroup.children.forEach((b, i) => {
@@ -485,6 +465,7 @@ function animate() {
     });
   }
 
+  // 解密卡片浮动
   if (cardMesh && cardMesh.visible) {
     const time = Date.now() * 0.001;
     cardMesh.rotation.y = Math.sin(time) * 0.15;
@@ -496,7 +477,7 @@ function animate() {
 
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
+
