@@ -1,9 +1,7 @@
 /* =========================================================================
-   VOIR // 3D INTERACTIVE MONOCHROME NOIR BLIND BOX
+   VOIR // 3D INTERACTIVE MONOCHROME NOIR BLIND BOX (MOBILE SLIDE OPTIMIZED)
    ========================================================================= */
 
-// 使用全开放 CORS 的 jsDelivr CDN 加速直链（原仓库音频的镜像解析）
-// 若 CDN 稍有延迟，备用了 raw.githubusercontent.com
 const AUDIO_URL = "https://cdn.jsdelivr.net/gh/byTheshadow/song@main/M500002bff4Z2rtysY.mp3";
 const STORAGE_KEY = "VOIR_LOCKED_MANIFEST_AUTH";
 
@@ -60,17 +58,24 @@ const BOX_REGISTRY = [
 ];
 
 // 状态机
-let currentStep = 'INTRO';
+let currentStep = 'INTRO'; // 'INTRO' | 'STAVE' | 'FOCUS_BOX' | 'UNBOXED'
 let selectedBoxIndex = null;
 let shakeCount = 0;
 let lastShakeTimestamp = 0;
-let isLocked = false;
 
 // 3D 场景
 let scene, camera, renderer;
 let waveMesh, staveLinesGroup, boxesGroup, cardMesh;
 let raycaster, mouse;
 let audioInstance = null;
+
+// 漫游平移控制器变量
+let isPointerDown = false;
+let pointerStartX = 0;
+let pointerStartY = 0;
+let camTargetX = 0;
+let camStartPanX = 0;
+let hasDragged = false;
 
 // DOM 元素
 const screenIntro = document.getElementById('screen-intro');
@@ -89,7 +94,7 @@ window.addEventListener('DOMContentLoaded', () => {
   animate();
 });
 
-// 控制台清空重置指令
+// 控制台清空指令
 window.resetVault = function() {
   localStorage.removeItem(STORAGE_KEY);
   console.log("%c[VOIR SYSTEM] 本地记录已清空，正在重载...", "color: #ffffff; background: #000000; padding: 4px 8px;");
@@ -101,7 +106,6 @@ function checkLocalStorageLock() {
   if (saved) {
     try {
       const data = JSON.parse(saved);
-      isLocked = true;
       showPermanentManifest(data);
     } catch (e) {
       localStorage.removeItem(STORAGE_KEY);
@@ -158,7 +162,7 @@ function createStaveAndBoxes() {
   const lineMat = new THREE.LineBasicMaterial({ color: 0x444444, transparent: true, opacity: 0.6 });
   for (let i = -2; i <= 2; i++) {
     const points = [];
-    for (let x = -20; x <= 20; x += 1) {
+    for (let x = -25; x <= 25; x += 1) {
       points.push(new THREE.Vector3(x, i * 0.8 + Math.sin(x * 0.3) * 0.5, Math.cos(x * 0.2) * 2));
     }
     const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
@@ -175,11 +179,12 @@ function createStaveAndBoxes() {
     roughness: 0.15
   });
 
+  // 4 个盲盒横向分布
   const positions = [
-    { x: -6, y: 1.2, z: -4 },
-    { x: -2, y: -0.8, z: -3 },
+    { x: -6.5, y: 1.2, z: -4 },
+    { x: -2.2, y: -0.8, z: -3 },
     { x: 2.2, y: 1.5, z: -4 },
-    { x: 6.2, y: -0.5, z: -5 }
+    { x: 6.5, y: -0.5, z: -5 }
   ];
 
   positions.forEach((pos, idx) => {
@@ -211,18 +216,13 @@ function create3DCardMesh() {
   scene.add(cardMesh);
 }
 
-// 纯净无阻碍的音频播放引擎（避开 CORS 干扰）
 function playRockBGM() {
   if (!audioInstance) {
     audioInstance = new Audio(AUDIO_URL);
     audioInstance.loop = true;
     audioInstance.volume = 0.85;
   }
-  audioInstance.play().then(() => {
-    console.log("[AUDIO] 摇滚音轨已成功加载并奏响。");
-  }).catch((err) => {
-    console.warn("[AUDIO] 自动播放受限，将在第一次屏幕触摸时触发:", err);
-    // iOS / 移动端防呆：任何屏幕轻触均唤醒音频
+  audioInstance.play().catch(() => {
     document.body.addEventListener('touchstart', () => {
       audioInstance.play();
     }, { once: true });
@@ -245,22 +245,50 @@ function bindEvents() {
   });
 
   window.addEventListener('resize', onWindowResize);
-  window.addEventListener('pointerdown', onPointerDown);
 
-  // 桌面拖拽摇晃
-  let isDragging = false;
-  let startX = 0;
-  window.addEventListener('mousedown', (e) => { isDragging = true; startX = e.clientX; });
-  window.addEventListener('mousemove', (e) => {
-    if (!isDragging || currentStep !== 'FOCUS_BOX') return;
-    if (Math.abs(e.clientX - startX) > 60) {
-      stepShake();
-      startX = e.clientX;
+  // 统一触摸与鼠标手势（支持左右滑动漫游 + 区分点击选盒）
+  window.addEventListener('pointerdown', (e) => {
+    isPointerDown = true;
+    pointerStartX = e.clientX;
+    pointerStartY = e.clientY;
+    hasDragged = false;
+    camStartPanX = camTargetX;
+  });
+
+  window.addEventListener('pointermove', (e) => {
+    if (!isPointerDown) return;
+    const deltaX = e.clientX - pointerStartX;
+    const deltaY = e.clientY - pointerStartY;
+
+    // 1. 五线谱阶段：左右拖拽/滑动漫游视角
+    if (currentStep === 'STAVE') {
+      if (Math.abs(deltaX) > 8) {
+        hasDragged = true; // 标记为拖拽行为，不再触发点选
+      }
+      // 敏感度映射（手机端与桌面端平衡）
+      const panFactor = (window.innerWidth < 600) ? 14 : 10;
+      camTargetX = camStartPanX - (deltaX / window.innerWidth) * panFactor;
+      camTargetX = Math.max(-7.5, Math.min(7.5, camTargetX)); // 限制滑动边界
+    }
+
+    // 2. 特写盲盒阶段：拖拽摇晃
+    if (currentStep === 'FOCUS_BOX') {
+      if (Math.abs(deltaX) > 50) {
+        stepShake();
+        pointerStartX = e.clientX;
+      }
     }
   });
-  window.addEventListener('mouseup', () => { isDragging = false; });
 
-  // 手机真机陀螺仪/加速度计摇晃
+  window.addEventListener('pointerup', (e) => {
+    isPointerDown = false;
+    // 如果在五线谱界面且没有拖拽滑动，则执行精准点击拾取
+    if (currentStep === 'STAVE' && !hasDragged) {
+      handleBoxPick(e);
+    }
+  });
+
+  // 手机端真机陀螺仪摇晃
   if (window.DeviceMotionEvent) {
     window.addEventListener('devicemotion', (e) => {
       if (currentStep !== 'FOCUS_BOX') return;
@@ -285,15 +313,20 @@ function transitionToStave() {
   staveLinesGroup.visible = true;
   boxesGroup.visible = true;
 
-  gsap.from(boxesGroup.position, { z: -30, duration: 1.5, ease: "power3.out" });
-  gsap.to(camera.position, { z: 12, duration: 1.5 });
+  // 针对手机竖屏拉远视角
+  const isPortrait = window.innerHeight > window.innerWidth;
+  const targetCamZ = isPortrait ? 15 : 12;
 
+  camTargetX = 0;
+  gsap.from(boxesGroup.position, { z: -30, duration: 1.5, ease: "power3.out" });
+  gsap.to(camera.position, { x: 0, y: 0, z: targetCamZ, duration: 1.5 });
+
+  // 手机端提示左右滑动
+  staveGuideTip.innerHTML = `<span class="guide-cross">✦</span><span>左右滑动探索 · 点击挑选音轨盲盒</span><span class="guide-cross">✦</span>`;
   staveGuideTip.classList.add('show');
 }
 
-function onPointerDown(e) {
-  if (currentStep !== 'STAVE') return;
-
+function handleBoxPick(e) {
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
@@ -318,7 +351,7 @@ function focusOnBox(box) {
   gsap.to(camera.position, {
     x: box.position.x,
     y: box.position.y,
-    z: box.position.z + 4.5,
+    z: box.position.z + 4.2,
     duration: 1.2,
     ease: "power2.inOut"
   });
@@ -327,10 +360,9 @@ function focusOnBox(box) {
   screenBoxUi.classList.add('active');
 }
 
-// 逐次摇晃逻辑
 function stepShake() {
   const now = Date.now();
-  if (now - lastShakeTimestamp < 500) return;
+  if (now - lastShakeTimestamp < 450) return;
   lastShakeTimestamp = now;
 
   if (shakeCount >= 3) return;
@@ -351,7 +383,6 @@ function stepShake() {
   });
 
   document.getElementById('shake-fill').style.width = `${(shakeCount / 3) * 100}%`;
-
   const boxData = BOX_REGISTRY[selectedBoxIndex];
   revealClue(shakeCount, boxData.clues[shakeCount - 1]);
 
@@ -387,7 +418,10 @@ function resetToStave() {
   systemStatus.innerText = "STATUS: SELECT_TRACK";
   staveGuideTip.classList.add('show');
 
-  gsap.to(camera.position, { x: 0, y: 0, z: 12, duration: 1 });
+  const isPortrait = window.innerHeight > window.innerWidth;
+  const targetCamZ = isPortrait ? 15 : 12;
+
+  gsap.to(camera.position, { x: camTargetX, y: 0, z: targetCamZ, duration: 1 });
 }
 
 function executeUnbox() {
@@ -435,7 +469,7 @@ function showPermanentManifest(data) {
   if (staveGuideTip) staveGuideTip.classList.remove('show');
 
   cardMesh.visible = true;
-  gsap.fromTo(camera.position, { z: 20 }, { z: 8, duration: 1.5, ease: "power3.out" });
+  gsap.fromTo(camera.position, { x: 0, y: 0, z: 20 }, { z: 8, duration: 1.5, ease: "power3.out" });
 
   screenManifest.classList.add('active');
 }
@@ -443,7 +477,7 @@ function showPermanentManifest(data) {
 function animate() {
   requestAnimationFrame(animate);
 
-  // 优雅的丝带正弦动态模拟
+  // 1. 序曲丝带波
   if (currentStep === 'INTRO' && waveMesh) {
     const time = Date.now() * 0.003;
     waveMesh.geometry.attributes.position.needsUpdate = true;
@@ -455,17 +489,21 @@ function animate() {
     }
   }
 
-  // 盲盒悬浮自转
-  if (currentStep === 'STAVE' && boxesGroup) {
-    const time = Date.now() * 0.0015;
-    boxesGroup.children.forEach((b, i) => {
-      b.position.y = b.userData.basePos.y + Math.sin(time + i * 1.5) * 0.2;
-      b.rotation.y += 0.008;
-      b.rotation.x += 0.004;
-    });
+  // 2. 五线谱阶段：平滑阻尼平移相机视角
+  if (currentStep === 'STAVE') {
+    camera.position.x += (camTargetX - camera.position.x) * 0.08;
+    
+    if (boxesGroup) {
+      const time = Date.now() * 0.0015;
+      boxesGroup.children.forEach((b, i) => {
+        b.position.y = b.userData.basePos.y + Math.sin(time + i * 1.5) * 0.2;
+        b.rotation.y += 0.008;
+        b.rotation.x += 0.004;
+      });
+    }
   }
 
-  // 解密卡片浮动
+  // 3. 解密卡片微幅浮动
   if (cardMesh && cardMesh.visible) {
     const time = Date.now() * 0.001;
     cardMesh.rotation.y = Math.sin(time) * 0.15;

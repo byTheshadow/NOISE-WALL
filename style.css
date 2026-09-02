@@ -33,6 +33,7 @@ body, html {
   width: 100vw;
   height: 100vh;
   z-index: 1;
+  touch-action: none; /* 禁用默认缩放滚动，全权由 Three.js 接管滑动 */
 }
 
 .noise-overlay {
