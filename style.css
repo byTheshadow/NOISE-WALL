@@ -3,7 +3,6 @@
   --text-main: #f0f0f0;
   --text-dim: #777777;
   --border-light: rgba(255, 255, 255, 0.15);
-  --border-active: rgba(255, 255, 255, 0.7);
   --font-serif: 'Noto Serif SC', serif;
   --font-display: 'Cinzel', serif;
   --font-mono: 'Space Mono', monospace;
@@ -36,19 +35,17 @@ body, html {
   z-index: 1;
 }
 
-/* 胶片噪点蒙版 */
 .noise-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: radial-gradient(circle, transparent 40%, rgba(0, 0, 0, 0.85) 100%);
+  background: radial-gradient(circle, transparent 30%, rgba(0, 0, 0, 0.9) 100%);
   pointer-events: none;
   z-index: 2;
 }
 
-/* HUD 顶部 */
 .hud-header {
   position: fixed;
   top: 0;
@@ -64,7 +61,40 @@ body, html {
   z-index: 10;
 }
 
-/* 全屏蒙版容器 */
+/* 五线谱提示文字 */
+.stave-guide-tip {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-serif);
+  font-size: 13px;
+  letter-spacing: 3px;
+  color: rgba(255, 255, 255, 0.85);
+  padding: 8px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(10, 10, 10, 0.6);
+  backdrop-filter: blur(10px);
+  z-index: 8;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.6s ease;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stave-guide-tip.show {
+  opacity: 1;
+  visibility: visible;
+}
+
+.guide-cross {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
 .screen-overlay {
   position: fixed;
   top: 0;
@@ -88,7 +118,6 @@ body, html {
 .pointer-events-none { pointer-events: none; }
 .pointer-events-auto { pointer-events: auto; }
 
-/* 序幕排版 */
 .intro-content {
   text-align: center;
   max-width: 480px;
@@ -110,7 +139,6 @@ body, html {
   letter-spacing: 12px;
   line-height: 1.1;
   margin-bottom: 24px;
-  text-transform: uppercase;
 }
 
 .intro-desc {
@@ -122,7 +150,6 @@ body, html {
   font-weight: 300;
 }
 
-/* 先锋按钮规范 */
 .noir-btn {
   background: transparent;
   border: 1px solid var(--border-light);
@@ -133,27 +160,17 @@ body, html {
   letter-spacing: 3px;
   cursor: pointer;
   transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
 }
 
 .noir-btn:hover {
-  border-color: var(--text-main);
+  border-color: #ffffff;
   background-color: #ffffff;
   color: #000000;
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
 }
 
-.ghost-btn {
-  border-color: rgba(255, 255, 255, 0.2);
-}
+.ghost-btn { border-color: rgba(255, 255, 255, 0.2); }
+.highlight-btn { border-color: #ffffff; background: rgba(255, 255, 255, 0.08); }
 
-.highlight-btn {
-  border-color: #ffffff;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-/* 盲盒交互 HUD */
 .box-hud-container {
   position: absolute;
   bottom: 48px;
@@ -162,7 +179,7 @@ body, html {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
+  gap: 16px;
 }
 
 .track-info {
@@ -177,21 +194,21 @@ body, html {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .clue-item {
-  background: rgba(18, 18, 18, 0.75);
+  background: rgba(18, 18, 18, 0.85);
   border: 1px solid var(--border-light);
-  backdrop-filter: blur(10px);
+  backdrop-filter: blur(12px);
   padding: 12px 18px;
   font-family: var(--font-serif);
   font-size: 13px;
   line-height: 1.6;
-  color: #cccccc;
+  color: #dcdcdc;
   opacity: 0;
-  transform: translateY(10px);
-  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(12px);
+  transition: all 0.6s cubic-bezier(0.16, 1, 0.3, 1);
   display: none;
 }
 
@@ -229,23 +246,19 @@ body, html {
 .decision-group {
   display: none;
   gap: 16px;
-  margin-top: 10px;
+  margin-top: 6px;
 }
 
-.decision-group.show {
-  display: flex;
-}
+.decision-group.show { display: flex; }
 
-/* 解密信笺卡片 (Manifest Card) */
 .manifest-wrapper {
   width: 90%;
   max-width: 440px;
-  background: rgba(12, 12, 12, 0.85);
+  background: rgba(12, 12, 12, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.3);
   backdrop-filter: blur(20px);
   padding: 36px 28px;
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.9);
-  position: relative;
 }
 
 .manifest-header {
@@ -259,8 +272,8 @@ body, html {
 
 .manifest-title {
   font-family: var(--font-display);
-  font-size: 18px;
-  letter-spacing: 3px;
+  font-size: 17px;
+  letter-spacing: 2px;
   margin-bottom: 16px;
   line-height: 1.4;
 }
@@ -292,11 +305,9 @@ body, html {
   padding-top: 16px;
 }
 
-/* 响应式调整 */
 @media (max-width: 600px) {
   .hud-header { padding: 16px 20px; }
   .box-hud-container { bottom: 24px; width: 92%; }
-  .manifest-wrapper { padding: 28px 20px; }
   .decision-group { flex-direction: column; width: 100%; }
   .decision-group .noir-btn { width: 100%; }
 }
