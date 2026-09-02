@@ -6,26 +6,27 @@
   <title>VOIR // 虚空回响</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <!-- 先锋英文字体 + 锐利中文字体 -->
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Noto+Serif+SC:wght@300;600;900&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
-  <!-- Three.js & GSAP -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
 </head>
 <body>
-  <!-- 噪点微粒蒙版 -->
   <div class="noise-overlay"></div>
   <canvas id="webgl-canvas"></canvas>
-
-  <!-- 音频容器 -->
-  <audio id="audio-player" src="https://github.com/byTheshadow/song/raw/refs/heads/main/M500002bff4Z2rtysY.mp3" preload="auto" crossorigin="anonymous"></audio>
 
   <!-- 顶部状态栏 -->
   <header class="hud-header">
     <div class="hud-tag">// NOISE_SYSTEM.V4</div>
     <div class="hud-status" id="system-status">STATUS: STANDBY</div>
   </header>
+
+  <!-- 五线谱漫游时的引导提示 -->
+  <div id="stave-guide-tip" class="stave-guide-tip">
+    <span class="guide-cross">✦</span>
+    <span>空间已校准 · 请点击选择一个音轨盲盒</span>
+    <span class="guide-cross">✦</span>
+  </div>
 
   <!-- 第 1 幕：虚空音波启动页 -->
   <section id="screen-intro" class="screen-overlay active">
@@ -34,7 +35,6 @@
       <h1 class="main-title">SONIC VOID</h1>
       <p class="intro-desc">虚空之中，唯有共振得以穿透物质。<br>佩戴耳机，以获取最佳动态声场。</p>
       <button id="btn-enter" class="noir-btn">
-        <span class="btn-glitch"></span>
         <span class="btn-text">/// 拨动琴弦 · 启封音轨</span>
       </button>
     </div>
@@ -54,8 +54,7 @@
 
       <!-- 交互控制面板 -->
       <div class="interaction-prompt" id="shake-prompt">
-        <span class="prompt-icon">✦</span>
-        <span id="prompt-text">摇晃设备或按住拖拽以破译线索</span>
+        <span id="prompt-text">摇晃设备 或 鼠标左右拖拽盒体</span>
         <div class="shake-progress-bar">
           <div class="shake-progress-fill" id="shake-fill"></div>
         </div>
@@ -64,10 +63,10 @@
       <!-- 抉择按键组 -->
       <div class="decision-group" id="decision-group">
         <button id="btn-cancel" class="noir-btn ghost-btn">
-          <span class="btn-text">↺ 封存 · 重选音轨</span>
+          <span class="btn-text">↺ 封存 · 换一个音轨</span>
         </button>
         <button id="btn-unlock" class="noir-btn highlight-btn">
-          <span class="btn-text">✦ 破壳解密</span>
+          <span class="btn-text">✦ 确认破壳解密</span>
         </button>
       </div>
     </div>
@@ -95,4 +94,5 @@
   <script src="main.js"></script>
 </body>
 </html>
+
 
