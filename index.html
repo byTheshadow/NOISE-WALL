@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, viewport-fit=cover"
+  />
+
+  <title>THE LAST FREQUENCY</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./style.css" />
+</head>
+
+<body>
+  <main id="app">
+
+    <div id="scene"></div>
+
+    <div class="grain"></div>
+    <div class="vignette"></div>
+
+    <header class="topbar">
+      <div class="brand">THE LAST FREQUENCY</div>
+      <div class="status" id="statusText">SYSTEM / STANDBY</div>
+    </header>
+
+    <section class="intro-screen" id="introScreen">
+      <div class="intro-copy">
+        <p class="eyebrow">PRIVATE AUDIO ARCHIVE / 001</p>
+
+        <h1>
+          THE<br />
+          FREQUENCY<br />
+          IS WAITING
+        </h1>
+
+        <p class="intro-cn">频率尚未苏醒</p>
+
+        <button class="primary-button" id="enterButton">
+          <span>ENTER THE SIGNAL</span>
+          <small>进入信号场</small>
+        </button>
+
+        <p class="audio-note" id="audioNote">
+          AUDIO CHANNEL / ATTEMPTING CONNECTION
+        </p>
+      </div>
+
+      <div class="intro-meta">
+        <span>MONOCHROME AUDIO EXPERIENCE</span>
+        <span>USE HEADPHONES IF POSSIBLE</span>
+      </div>
+    </section>
+
+    <section class="vault-screen hidden" id="vaultScreen">
+      <div class="vault-heading">
+        <p class="eyebrow">THE STAVE CONSTELLATION / 004 NODES</p>
+        <h2>SELECT A<br />RESONANCE</h2>
+        <p class="vault-cn">选择一段尚未开启的频率</p>
+      </div>
+
+      <div class="vault-instruction">
+        <span>DRAG TO EXPLORE</span>
+        <span>TAP A NODE TO INSPECT</span>
+      </div>
+
+      <div class="track-list" id="trackList"></div>
+    </section>
+
+    <section class="box-screen hidden" id="boxScreen">
+      <div class="box-header">
+        <p class="eyebrow" id="boxEyebrow">TRACK 01 / OVERDRIVE</p>
+        <h2 id="boxTitle">失真纪元</h2>
+        <p class="box-subtitle" id="boxSubtitle"></p>
+      </div>
+
+      <div class="box-panel">
+        <div class="shake-progress">
+          <div class="progress-label">
+            <span>RESONANCE LEVEL</span>
+            <span id="shakeCount">00 / 03</span>
+          </div>
+
+          <div class="progress-line">
+            <span id="progressBar"></span>
+          </div>
+        </div>
+
+        <div class="clue-area" id="clueArea">
+          <p class="clue-placeholder">
+            SHAKE THE OBJECT TO REVEAL ITS ECHO
+          </p>
+        </div>
+
+        <div class="box-actions">
+          <button class="primary-button shake-button" id="shakeButton">
+            <span>SHAKE THE BOX</span>
+            <small>摇晃盲盒</small>
+          </button>
+
+          <button class="text-button hidden" id="openButton">
+            OPEN THE SIGNAL / 打开信号
+          </button>
+
+          <button class="text-button" id="changeButton">
+            CHANGE THE TRACK / 更换音轨
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="claimed-screen hidden" id="claimedScreen">
+      <div class="claimed-content">
+        <p class="eyebrow">PRIVATE ARCHIVE / SIGNAL CLAIMED</p>
+
+        <h2 id="claimedTitle">ARCHIVED FREQUENCY</h2>
+
+        <div class="claimed-line"></div>
+
+        <p class="claimed-date" id="claimedDate"></p>
+
+        <article class="manifest-card">
+          <p class="card-code" id="claimedCode"></p>
+          <h3 id="claimedManifestTitle"></h3>
+          <div id="claimedText"></div>
+        </article>
+
+        <p class="locked-note">
+          THIS FREQUENCY HAS BEEN OPENED ONCE.<br />
+          此频率已经被开启过一次。
+        </p>
+      </div>
+    </section>
+
+    <section class="opening-layer hidden" id="openingLayer">
+      <div class="opening-flash"></div>
+      <div class="opening-title">SIGNAL MANIFESTED</div>
+    </section>
+
+    <audio
+      id="backgroundAudio"
+      src="https://github.com/byTheshadow/song/raw/refs/heads/main/M500002bff4Z2rtysY.mp3"
+      loop
+      crossorigin="anonymous"
+      playsinline
+    ></audio>
+
+  </main>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
