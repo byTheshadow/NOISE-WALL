@@ -1,8 +1,11 @@
 /* =========================================================================
-   VOIR // 3D INTERACTIVE MONOCHROME NOIR BLIND BOX
+   VOIR // 3D INTERACTIVE MONOCHROME NOIR BLIND BOX (UPDATED)
    ========================================================================= */
 
-// 1. 盲盒与迷幻文案数据源（完全隐去世俗谜底）
+const AUDIO_URL = "https://github.com/byTheshadow/song/raw/refs/heads/main/M500002bff4Z2rtysY.mp3";
+const STORAGE_KEY = "VOIR_LOCKED_MANIFEST_AUTH";
+
+// 盲盒迷幻文案数据源
 const BOX_REGISTRY = [
   {
     id: 1,
@@ -54,26 +57,27 @@ const BOX_REGISTRY = [
   }
 ];
 
-// 2. 状态机与全局变量
-const STORAGE_KEY = "VOIR_LOCKED_MANIFEST_AUTH";
-let currentStep = 'INTRO'; // 'INTRO' | 'STAVE' | 'FOCUS_BOX' | 'UNBOXED'
+// 状态控制
+let currentStep = 'INTRO';
 let selectedBoxIndex = null;
 let shakeCount = 0;
-let lastShakeTime = 0;
+let lastShakeTimestamp = 0;
 let isLocked = false;
 
-// 3. Three.js 场景对象
+// 3D 场景
 let scene, camera, renderer;
 let waveMesh, staveLinesGroup, boxesGroup, cardMesh;
 let raycaster, mouse;
-let audioContext, analyser, audioSource, dataArray;
-let isAudioActive = false;
 
-// DOM 元素
-const audioEl = document.getElementById('audio-player');
+// 音频
+let audioEl = null;
+let audioContext = null, analyser = null, dataArray = null;
+
+// DOM 节点
 const screenIntro = document.getElementById('screen-intro');
 const screenBoxUi = document.getElementById('screen-box-ui');
 const screenManifest = document.getElementById('screen-manifest');
+const staveGuideTip = document.getElementById('stave-guide-tip');
 const systemStatus = document.getElementById('system-status');
 const btnEnter = document.getElementById('btn-enter');
 const btnCancel = document.getElementById('btn-cancel');
@@ -86,17 +90,26 @@ window.addEventListener('DOMContentLoaded', () => {
   animate();
 });
 
-// 检查本地持久化锁定
+// 提供给控制台快速测试重置的指令
+window.resetVault = function() {
+  localStorage.removeItem(STORAGE_KEY);
+  console.log("%c[VOIR SYSTEM] 本地抽取记录已彻底清空，正在重载页面...", "color: #ffffff; background: #000000; padding: 4px 8px;");
+  location.reload();
+};
+
 function checkLocalStorageLock() {
-  const savedRecord = localStorage.getItem(STORAGE_KEY);
-  if (savedRecord) {
-    const data = JSON.parse(savedRecord);
-    isLocked = true;
-    showPermanentManifest(data);
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (saved) {
+    try {
+      const data = JSON.parse(saved);
+      isLocked = true;
+      showPermanentManifest(data);
+    } catch (e) {
+      localStorage.removeItem(STORAGE_KEY);
+    }
   }
 }
 
-// 初始化 Three.js 引擎
 function initThree() {
   const canvas = document.getElementById('webgl-canvas');
   scene = new THREE.Scene();
@@ -112,10 +125,7 @@ function initThree() {
   raycaster = new THREE.Raycaster();
   mouse = new THREE.Vector2();
 
-  // 灯光设计：冷白轮廓光 + 极暗环境光
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
-  scene.add(ambientLight);
-
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4));
   const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
   mainLight.position.set(10, 20, 15);
   scene.add(mainLight);
@@ -129,9 +139,8 @@ function initThree() {
   create3DCardMesh();
 }
 
-// 创建第 1 幕：3D 音频丝带波
 function createWaveVisualizer() {
-  const geometry = new THREE.PlaneGeometry(30, 6, 64, 16);
+  const geometry = new THREE.PlaneGeometry(32, 6, 64, 16);
   const material = new THREE.MeshStandardMaterial({
     color: 0xcccccc,
     wireframe: true,
@@ -140,37 +149,31 @@ function createWaveVisualizer() {
   });
   waveMesh = new THREE.Mesh(geometry, material);
   waveMesh.rotation.x = -Math.PI / 4;
-  waveMesh.position.set(0, 0, 0);
   scene.add(waveMesh);
 }
 
-// 创建第 3 幕：五线谱星轨 + 4个黑曜石几何盲盒
 function createStaveAndBoxes() {
   staveLinesGroup = new THREE.Group();
   boxesGroup = new THREE.Group();
 
-  // 构建 5 条流线型五线谱轨道
-  const lineMaterial = new THREE.LineBasicMaterial({ color: 0x444444, transparent: true, opacity: 0.6 });
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x444444, transparent: true, opacity: 0.6 });
   for (let i = -2; i <= 2; i++) {
     const points = [];
     for (let x = -20; x <= 20; x += 1) {
       points.push(new THREE.Vector3(x, i * 0.8 + Math.sin(x * 0.3) * 0.5, Math.cos(x * 0.2) * 2));
     }
     const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
-    const line = new THREE.Line(lineGeo, lineMaterial);
-    staveLinesGroup.add(line);
+    staveLinesGroup.add(new THREE.Line(lineGeo, lineMat));
   }
   staveLinesGroup.position.set(0, 0, -5);
   staveLinesGroup.visible = false;
   scene.add(staveLinesGroup);
 
-  // 4 个黑曜石几何盲盒
-  const boxGeometry = new THREE.BoxGeometry(1.8, 2.2, 1.8);
-  const boxMaterial = new THREE.MeshStandardMaterial({
+  const boxGeo = new THREE.BoxGeometry(1.8, 2.2, 1.8);
+  const boxMat = new THREE.MeshStandardMaterial({
     color: 0x111111,
     metalness: 0.9,
-    roughness: 0.15,
-    wireframe: false
+    roughness: 0.15
   });
 
   const positions = [
@@ -181,15 +184,13 @@ function createStaveAndBoxes() {
   ];
 
   positions.forEach((pos, idx) => {
-    const box = new THREE.Mesh(boxGeometry, boxMaterial.clone());
+    const box = new THREE.Mesh(boxGeo, boxMat.clone());
     box.position.set(pos.x, pos.y, pos.z);
-    box.userData = { id: idx + 1, basePos: { ...pos }, originalScale: 1 };
-    
-    // 线框描边
-    const edgeGeo = new THREE.EdgesGeometry(boxGeometry);
-    const edgeMat = new THREE.LineBasicMaterial({ color: 0x888888 });
-    const wireframe = new THREE.LineSegments(edgeGeo, edgeMat);
-    box.add(wireframe);
+    box.userData = { id: idx + 1, basePos: { ...pos } };
+
+    const edgeGeo = new THREE.EdgesGeometry(boxGeo);
+    const edgeMat = new THREE.LineBasicMaterial({ color: 0x777777 });
+    box.add(new THREE.LineSegments(edgeGeo, edgeMat));
 
     boxesGroup.add(box);
   });
@@ -198,7 +199,6 @@ function createStaveAndBoxes() {
   scene.add(boxesGroup);
 }
 
-// 创建第 5 幕：3D 解密悬浮卡片
 function create3DCardMesh() {
   const cardGeo = new THREE.BoxGeometry(4, 6, 0.05);
   const cardMat = new THREE.MeshStandardMaterial({
@@ -212,29 +212,46 @@ function create3DCardMesh() {
   scene.add(cardMesh);
 }
 
-// 音频初始化
-function setupAudio() {
-  if (isAudioActive) return;
-  audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  analyser = audioContext.createAnalyser();
-  analyser.fftSize = 64;
-  dataArray = new Uint8Array(analyser.frequencyBinCount);
+// 健壮的双轨音频播放器
+function startAudioPlayback() {
+  if (!audioEl) {
+    audioEl = new Audio();
+    audioEl.src = AUDIO_URL;
+    audioEl.loop = true;
+    audioEl.crossOrigin = "anonymous";
+  }
 
-  audioSource = audioContext.createMediaElementSource(audioEl);
-  audioSource.connect(analyser);
-  analyser.connect(audioContext.destination);
+  // 尝试启动 Web Audio 频谱
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtx) {
+      if (!audioContext) {
+        audioContext = new AudioCtx();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 64;
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const source = audioContext.createMediaElementSource(audioEl);
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+      }
+      if (audioContext.state === 'suspended') {
+        audioContext.resume();
+      }
+    }
+  } catch (err) {
+    console.warn("Web Audio API 降级为原生高保真流:", err);
+  }
 
-  audioEl.play().catch(() => {});
-  isAudioActive = true;
+  audioEl.play().catch(e => {
+    console.log("音频自动播放等待手势唤醒:", e);
+  });
 }
 
-// 事件绑定
 function bindEvents() {
-  // 点击启动
   btnEnter.addEventListener('click', () => {
-    setupAudio();
+    startAudioPlayback();
     systemStatus.innerText = "STATUS: RESONATING";
-    
+
     gsap.to(screenIntro, {
       opacity: 0,
       duration: 0.8,
@@ -245,44 +262,39 @@ function bindEvents() {
     });
   });
 
-  // 视口调整
   window.addEventListener('resize', onWindowResize);
-
-  // 鼠标 / 触摸选盒点击
   window.addEventListener('pointerdown', onPointerDown);
 
-  // 桌面端鼠标拖拽摇晃
+  // 桌面拖拽摇晃
   let isDragging = false;
   let startX = 0;
   window.addEventListener('mousedown', (e) => { isDragging = true; startX = e.clientX; });
   window.addEventListener('mousemove', (e) => {
     if (!isDragging || currentStep !== 'FOCUS_BOX') return;
-    if (Math.abs(e.clientX - startX) > 40) {
-      triggerShake();
+    if (Math.abs(e.clientX - startX) > 60) {
+      stepShake();
       startX = e.clientX;
     }
   });
   window.addEventListener('mouseup', () => { isDragging = false; });
 
-  // 手机端陀螺仪摇晃检测
+  // 手机真机加速度计摇晃
   if (window.DeviceMotionEvent) {
     window.addEventListener('devicemotion', (e) => {
       if (currentStep !== 'FOCUS_BOX') return;
       const acc = e.accelerationIncludingGravity;
       if (!acc) return;
-      const speed = Math.abs(acc.x + acc.y + acc.z);
-      if (speed > 25) {
-        triggerShake();
+      const totalAcc = Math.abs(acc.x || 0) + Math.abs(acc.y || 0) + Math.abs(acc.z || 0);
+      if (totalAcc > 26) {
+        stepShake();
       }
     });
   }
 
-  // 抉择按键
   btnCancel.addEventListener('click', resetToStave);
   btnUnlock.addEventListener('click', executeUnbox);
 }
 
-// 从音波过渡到五线谱星轨
 function transitionToStave() {
   currentStep = 'STAVE';
   systemStatus.innerText = "STATUS: SELECT_TRACK";
@@ -293,9 +305,11 @@ function transitionToStave() {
 
   gsap.from(boxesGroup.position, { z: -30, duration: 1.5, ease: "power3.out" });
   gsap.to(camera.position, { z: 12, duration: 1.5 });
+
+  // 显示选盒引导提示
+  staveGuideTip.classList.add('show');
 }
 
-// 点击拾取盲盒
 function onPointerDown(e) {
   if (currentStep !== 'STAVE') return;
 
@@ -311,16 +325,16 @@ function onPointerDown(e) {
   }
 }
 
-// 聚焦选中盲盒
 function focusOnBox(box) {
   currentStep = 'FOCUS_BOX';
   selectedBoxIndex = box.userData.id - 1;
   const boxData = BOX_REGISTRY[selectedBoxIndex];
 
+  // 隐藏五线谱引导，更新状态
+  staveGuideTip.classList.remove('show');
   systemStatus.innerText = `LOCKED: TRACK 0${boxData.id}`;
   document.getElementById('track-indicator').innerText = boxData.name;
 
-  // 相机推进聚焦
   gsap.to(camera.position, {
     x: box.position.x,
     y: box.position.y,
@@ -329,24 +343,26 @@ function focusOnBox(box) {
     ease: "power2.inOut"
   });
 
-  screenBoxUi.classList.add('active');
   resetShakeState();
+  screenBoxUi.classList.add('active');
 }
 
-// 摇晃状态机
-function triggerShake() {
+// 严格逐次摇晃状态机
+function stepShake() {
   const now = Date.now();
-  if (now - lastShakeTime < 300) return; // 防抖
-  lastShakeTime = now;
+  if (now - lastShakeTimestamp < 500) return; // 严格限频防误触
+  lastShakeTimestamp = now;
 
+  if (shakeCount >= 3) return;
   shakeCount++;
+
   const activeBox = boxesGroup.children[selectedBoxIndex];
 
-  // 物理抖动动效
+  // 物理抖动
   gsap.to(activeBox.rotation, {
-    x: (Math.random() - 0.5) * 0.8,
-    y: (Math.random() - 0.5) * 0.8,
-    z: (Math.random() - 0.5) * 0.8,
+    x: (Math.random() - 0.5) * 0.7,
+    y: (Math.random() - 0.5) * 0.7,
+    z: (Math.random() - 0.5) * 0.7,
     duration: 0.1,
     yoyo: true,
     repeat: 3,
@@ -355,15 +371,13 @@ function triggerShake() {
     }
   });
 
-  // 更新进度与线索
-  const fillPercent = Math.min((shakeCount / 3) * 100, 100);
-  document.getElementById('shake-fill').style.width = `${fillPercent}%`;
+  // 进度更新
+  document.getElementById('shake-fill').style.width = `${(shakeCount / 3) * 100}%`;
 
   const boxData = BOX_REGISTRY[selectedBoxIndex];
-  if (shakeCount >= 1) revealClue(1, boxData.clues[0]);
-  if (shakeCount >= 2) revealClue(2, boxData.clues[1]);
-  if (shakeCount >= 3) {
-    revealClue(3, boxData.clues[2]);
+  revealClue(shakeCount, boxData.clues[shakeCount - 1]);
+
+  if (shakeCount === 3) {
     document.getElementById('shake-prompt').style.display = 'none';
     document.getElementById('decision-group').classList.add('show');
   }
@@ -371,7 +385,7 @@ function triggerShake() {
 
 function revealClue(index, text) {
   const clueEl = document.getElementById(`clue-${index}`);
-  if (!clueEl.classList.contains('show')) {
+  if (clueEl) {
     clueEl.innerText = text;
     clueEl.classList.add('show');
   }
@@ -389,35 +403,32 @@ function resetShakeState() {
   }
 }
 
-// 封存并返回五线谱
 function resetToStave() {
   currentStep = 'STAVE';
   screenBoxUi.classList.remove('active');
   systemStatus.innerText = "STATUS: SELECT_TRACK";
+  staveGuideTip.classList.add('show');
 
   gsap.to(camera.position, { x: 0, y: 0, z: 12, duration: 1 });
 }
 
-// 执行终极解密与破壳
 function executeUnbox() {
   currentStep = 'UNBOXED';
   screenBoxUi.classList.remove('active');
+  staveGuideTip.classList.remove('show');
   systemStatus.innerText = "STATUS: DECRYPTED_FOREVER";
 
   const targetBox = boxesGroup.children[selectedBoxIndex];
   const boxData = BOX_REGISTRY[selectedBoxIndex];
 
-  // 爆破解构动效
   gsap.to(targetBox.scale, {
-    x: 2.5, y: 2.5, z: 2.5,
-    duration: 0.3,
+    x: 2.2, y: 2.2, z: 2.2,
+    duration: 0.4,
     ease: "power2.out",
     onComplete: () => {
-      targetBox.visible = false;
       boxesGroup.visible = false;
       staveLinesGroup.visible = false;
-      
-      // 永久写入本地 LocalStorage
+
       const record = {
         boxId: boxData.id,
         code: boxData.code,
@@ -426,14 +437,11 @@ function executeUnbox() {
         time: new Date().toISOString().replace('T', ' ').substring(0, 19)
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(record));
-      
-      // 展示终极信笺
       showPermanentManifest(record);
     }
   });
 }
 
-// 展示永久印记页面
 function showPermanentManifest(data) {
   currentStep = 'UNBOXED';
   systemStatus.innerText = "STATUS: PERMANENT_ARCHIVE";
@@ -446,6 +454,7 @@ function showPermanentManifest(data) {
   if (waveMesh) waveMesh.visible = false;
   if (boxesGroup) boxesGroup.visible = false;
   if (staveLinesGroup) staveLinesGroup.visible = false;
+  if (staveGuideTip) staveGuideTip.classList.remove('show');
 
   cardMesh.visible = true;
   gsap.fromTo(camera.position, { z: 20 }, { z: 8, duration: 1.5, ease: "power3.out" });
@@ -453,11 +462,9 @@ function showPermanentManifest(data) {
   screenManifest.classList.add('active');
 }
 
-// 动画渲染循环
 function animate() {
   requestAnimationFrame(animate);
 
-  // 音频跳动关联
   if (analyser && dataArray && currentStep === 'INTRO') {
     analyser.getByteFrequencyData(dataArray);
     const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
@@ -469,7 +476,6 @@ function animate() {
     }
   }
 
-  // 盲盒在五线谱上的漂浮动效
   if (currentStep === 'STAVE' && boxesGroup) {
     const time = Date.now() * 0.0015;
     boxesGroup.children.forEach((b, i) => {
@@ -479,7 +485,6 @@ function animate() {
     });
   }
 
-  // 解密卡片微幅 3D 浮动自转
   if (cardMesh && cardMesh.visible) {
     const time = Date.now() * 0.001;
     cardMesh.rotation.y = Math.sin(time) * 0.15;
@@ -491,6 +496,7 @@ function animate() {
 
 function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
